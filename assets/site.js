@@ -1,11 +1,23 @@
 (() => {
 const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-// forms open the visitor's email app with everything filled in
-document.querySelectorAll('form[data-subject]').forEach((f) => f.addEventListener('submit', (e) => {
+// forms go to our inbox through FormSubmit; if that fails, the visitor's email app opens filled in
+document.querySelectorAll('form[data-subject]').forEach((f) => f.addEventListener('submit', async (e) => {
   e.preventDefault();
-  const body = [...new FormData(f)].map(([k, v]) => k + ': ' + v).join('\n');
-  location.href = 'mailto:ismail@conticonnects.com?subject=' + encodeURIComponent(f.dataset.subject) + '&body=' + encodeURIComponent(body);
-  f.querySelector('[role=status]').textContent = 'Your email app should open with this filled in. If it does not, write to ismail@conticonnects.com.';
+  const d = Object.fromEntries(new FormData(f)), say = f.querySelector('[role=status]'), b = f.querySelector('button');
+  if (d._honey) return;
+  b.disabled = true; say.textContent = 'Sending...';
+  try {
+    const r = await fetch('https://formsubmit.co/ajax/ismail@conticonnects.com', { method: 'POST', signal: AbortSignal.timeout(12000), headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ ...d, _subject: f.dataset.subject + ' from the website', _template: 'table', _cc: 'nabeel@conticonnects.com' }) });
+    const j = await r.json();
+    if (!r.ok || String(j.success) !== 'true') throw 0;
+    f.reset(); say.textContent = 'Sent. Thank you, we will reply by email.';
+  } catch {
+    delete d._honey;
+    location.href = 'mailto:ismail@conticonnects.com?cc=nabeel@conticonnects.com&subject=' + encodeURIComponent(f.dataset.subject) + '&body=' + encodeURIComponent(Object.entries(d).map(([k, v]) => k + ': ' + v).join('\n'));
+    say.textContent = 'We could not send the form, so your email app should open with it filled in. If it does not, write to ismail@conticonnects.com.';
+  }
+  b.disabled = false;
 }));
 if (still) return;
 // moving fabric: wide screens only, after the page has loaded, never on data saver
